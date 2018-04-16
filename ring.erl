@@ -45,7 +45,7 @@ data(Dict) ->
 
     {erase, Key} -> Dict = erase(Key, Dict), data(Dict);
 
-    {fetch, Key, PID} -> Value = fetch(Key, Dict), PID ! {Value}, data(Dict)
+    {fetch, Key, PID} -> Value = fetch(Key, Dict), PID ! {val, Value}, data(Dict)
 
   end.
 
@@ -81,8 +81,16 @@ ring_node(ChildPid, Manager, Taille_ring, Data) ->
     {kill, PID, Child} -> ChildPid ! {kill, self(), ChildPid},
     ring_node(Child, Manager, Taille_ring, Data);
 
-    {add_info, Info} -> UUID = 12, Data ! {append, UUID, Info};
+    {add_info, Info} -> UUID = 12, Data ! {append, UUID, Info},
+    ring_node(ChildPid, Manager, Taille_ring, Data);
 
+    {info, UUID} -> Data ! {fetch, UUID, PID},
+    ring_node(ChildPid, Manager, Taille_ring, Data);
+
+    {val, Value, PID} when self()=PID -> ring_node(ChildPid, Manager, Taille_ring, Data);
+
+    {val, Value, PID} -> ChildPid ! {val, Value, PID},
+    ring_node(ChildPid, Manager, Taille_ring, Data);
 
     {broad} -> io:fwrite("Début broadcast~p~n",[ChildPid]), ChildPid ! {broad, 0, ChildPid}, ring_node(ChildPid, Manager, Taille_ring, Data);
 
