@@ -1,5 +1,5 @@
 -module(ring).
--export([build/1, ring_node/3, loop/1, test/0, data/1]).
+-export([build/1, ring_node/4, loop/1, test/0, data/1]).
 
 build(N) ->
   Manager = self(),
@@ -41,11 +41,11 @@ send_messages(N) ->
 data(Dict) ->
   receive
 
-    {append, Key, Value} -> Dict = append(Key, Value, Dict), data(Dict);
+    {append, Key, Value} -> Dict = dict:append(Key, Value, Dict), data(Dict);
 
-    {erase, Key} -> Dict = erase(Key, Dict), data(Dict);
+    {erase, Key} -> Dict = dict:erase(Key, Dict), data(Dict);
 
-    {fetch, Key, PID} -> Value = fetch(Key, Dict), PID ! {val, Value}, data(Dict)
+    {fetch, Key, PID} -> Value = dict:fetch(Key, Dict), PID ! {val, Value}, data(Dict)
 
   end.
 
@@ -66,28 +66,30 @@ ring_node(ChildPid, Manager, Taille_ring, Data) ->
       ring_node(Child, Manager, Taille_ring, Data);
 
 
-    {kill, PID} when self() = PID -> ChildPid ! {kill, self(), ChildPid}, ring_node(Child, Manager, Taille_ring, Data);
+    {kill, PID} when self() == PID -> ChildPid ! {kill, self(), ChildPid}, ring_node(ChildPid, Manager, Taille_ring, Data);
 
-    {kill, PID, Child} when ChildPid = PID -> ChildPid = Child,
+    {kill, PID, Child} when ChildPid == PID -> ChildPid = Child,
     ring_node(Child, Manager, Taille_ring, Data); %pid de celui qu'on supprime et son fils
 
     {add} -> Child = spawn(?MODULE, ring_node, [null, Manager, Taille_ring+1]),
-    Child ! {add2, ChildPid}
-    ring_node(Child, Manager, Taille_ring, Data)
+    Child ! {add2, ChildPid},
+    ring_node(Child, Manager, Taille_ring, Data),
+    ring_node(ChildPid, Manager, Taille_ring, Data);
 
     {add2, NewChild} -> ChildPid = NewChild,
     ring_node(ChildPid, Manager, Taille_ring, Data);
 
     {kill, PID, Child} -> ChildPid ! {kill, self(), ChildPid},
+    ring_node(ChildPid, Manager, Taille_ring, Data),
     ring_node(Child, Manager, Taille_ring, Data);
 
     {add_info, Info} -> UUID = 12, Data ! {append, UUID, Info},
     ring_node(ChildPid, Manager, Taille_ring, Data);
 
-    {info, UUID} -> Data ! {fetch, UUID, PID},
+    {info, UUID} -> Data ! {fetch, UUID, self()},
     ring_node(ChildPid, Manager, Taille_ring, Data);
 
-    {val, Value, PID} when self()=PID -> ring_node(ChildPid, Manager, Taille_ring, Data);
+    {val, Value, PID} when self() == PID -> ring_node(ChildPid, Manager, Taille_ring, Data);
 
     {val, Value, PID} -> ChildPid ! {val, Value, PID},
     ring_node(ChildPid, Manager, Taille_ring, Data);
