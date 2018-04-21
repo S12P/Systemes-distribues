@@ -5,9 +5,9 @@ build(N) ->
   Manager = self(),
   register(ring, Manager),
   %data(dict:new()),
-  Data = spawn(?MODULE, data, [dict:new()]),
+  Data = spawn(node(), ?MODULE, data, [dict:new()]),
   Data ! {debut},
-  Root = spawn(?MODULE, ring_node, [null, null, Manager, N, null]),
+  Root = spawn(node(), ?MODULE, ring_node, [null, null, Manager, N, null]),
   Root ! {createdebut, N},
   %register(root, Root),
   %ring_node(Root, Manager, 1),
@@ -35,10 +35,10 @@ loop(N) ->
 
     ok ->
       io:format("Ring was built~n"),
-      %send_messages(N),
       loop(N);
 
-    {creation, Taille_ring, NN} -> io:fwrite("taille ring ~p, ce qu'il reste ~p~n",[Taille_ring,NN]), loop(N);
+    {creation, Taille_ring, NN} -> io:fwrite("taille ring ~p, ce qu'il reste ~p~n",
+          [Taille_ring,NN]), loop(N);
 
     {message, finished} -> io:format("It finished~n"),loop(N);
 
@@ -46,12 +46,6 @@ loop(N) ->
       loop(N)
   end.
 
-send_messages(0) ->
-  ring ! {message, finished};
-
-send_messages(N) ->
-  ring ! {message, N},
-  send_messages(N-1).
 
 
 
@@ -62,39 +56,35 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root) ->
     yo -> io:fwrite("yopp");
 
     {create, 0} ->
-      Manager ! {bro, self()}, %Manager ! yo, %ChildPid ! {broad},
-      io:fwrite("ringg ~p et ~p~n",[self(),Root]),
+      Manager ! {bro, self()},
       ring_node(self(), Root, Manager, Taille_ring, Root);
 
     {createdebut, N} ->
-      Child = spawn(?MODULE, ring_node, [self(), null, Manager, Taille_ring, self()]),
+      Child = spawn(node(), ?MODULE, ring_node, [self(), null, Manager, Taille_ring, self()]),
       Child ! {create, N-1},
       Manager ! {creation, Taille_ring, N},
-      io:fwrite("ring ~p et ~p~n",[self(),Child]),
       ring_node(self(), Child, Manager, Taille_ring,Root);
 
     {create, N} ->
-      Child = spawn(?MODULE, ring_node, [self(), null, Manager, Taille_ring,Root]),
+      Child = spawn(node(), ?MODULE, ring_node, [self(), null, Manager, Taille_ring,Root]),
       Child ! {create, N-1},
       Manager ! {creation, Taille_ring, N},
-      io:fwrite("ring ~p et ~p~n",[self(),Child]),
       ring_node(self(), Child, Manager, Taille_ring, Root);
 
     {kill, PID} when self() == PID -> ChildPid ! {kill, self(), ChildPid, Taille_ring-1};%, ring_node(Father, ChildPid, Manager, Taille_ring, Root);
 
-    {kill, PID, Child, NewTaille_ring} -> if ChildPid == PID -> io:fwrite("yop~p~p~p~n",[Child, ChildPid,self()]),
+    {kill, PID, Child, NewTaille_ring} -> if ChildPid == PID ->
     ring_node(Father, Child, Manager, NewTaille_ring, Root); %pid de celui qu'on supprime et son fils
-                                          true -> io:fwrite("wesh~p~p~p~n",[Father,self(),ChildPid]), ChildPid ! {kill, PID, Child, NewTaille_ring}, ring_node(Father, ChildPid, Manager, NewTaille_ring, Root) end;
+                                          true -> ChildPid ! {kill, PID, Child, NewTaille_ring}, ring_node(Father, ChildPid, Manager, NewTaille_ring, Root) end;
 
-    {add} -> io:fwrite("add~p~n",[self()]),
-    Child = spawn(?MODULE, ring_node, [null, null, Manager, Taille_ring+1, null]),
+    {add} -> %io:fwrite("add~p~n",[self()]),
+    Child = spawn(node(), ?MODULE, ring_node, [null, null, Manager, Taille_ring+1, null]),
     io:fwrite("addChild ~p~n",[Child]),
     Child ! {add2, ChildPid, Taille_ring+1},
     ring_node(self(), Child, Manager, Taille_ring+1, Root);
     %ring_node(Father, ChildPid, Manager, Taille_ring+1, Root);
 
-    {add2, NewChild, NewTaille_ring} -> io:fwrite("add2~p~p~p~n",[self(),NewChild,Father]),
-    io:fwrite("add22~p~p~p~n",[self(),NewChild,Father]),
+    {add2, NewChild, NewTaille_ring} ->
     NewChild ! {broadadd, NewTaille_ring},
     ring_node(self(), NewChild, Manager, NewTaille_ring, Root);
 
@@ -103,10 +93,11 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root) ->
     ChildPid ! {broadadd, 0, ChildPid, NewTaille_ring}, ring_node(Father, ChildPid, Manager, NewTaille_ring,Root);
 
     {broadadd, Nb, PID, NewTaille_ring} -> if NewTaille_ring - Nb == 0
-      -> io:fwrite("Fin broadcastadd ~p~n",[ChildPid]);
+      -> io:fwrite("Fin broadcastadd ~p~n",[ChildPid]),
+        ring_node(Father, ChildPid, Manager, Taille_ring,Root);
 
                             true -> ChildPid ! {broadadd, Nb + 1, ChildPid, NewTaille_ring},
-                              io:fwrite("Broadcastadd ~p ~p ~p~n",[ChildPid,Nb,Taille_ring]),
+                              io:fwrite("Broadcastadd ~p ~n",[ChildPid]),
                               ring_node(Father, ChildPid, Manager, Taille_ring,Root) end;
 
     {kill, PID, Child} -> ChildPid ! {kill, self(), ChildPid},
@@ -118,7 +109,7 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root) ->
     {broad, Nb, PID} -> if Taille_ring - Nb == 0 -> io:fwrite("Fin broadcast ~p~n",[ChildPid]),
     ring_node(Father, ChildPid, Manager, Taille_ring,Root);
                         true -> ChildPid ! {broad, Nb + 1, ChildPid},
-                        io:fwrite("Broadcast ~p ~p ~p~n",[ChildPid,Nb,Taille_ring]),
+                        io:fwrite("Broadcast ~p ~n",[ChildPid]),
                         ring_node(Father, ChildPid, Manager, Taille_ring,Root) end
 
   end.
