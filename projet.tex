@@ -42,6 +42,10 @@ J'ai un seul fichier qui gère tout.
 
 \section{Usage}
 
+J'ai deux fichier ring.erl qui marche qu'en local et ring2.erl qui marche en réseau. Les deux fichiers diffèrent tres peu mais il me semblait intéressant de donner les deux fichiers.
+\subsection{Fichier ring.erl}
+Lancer : erl
+
 Compiler : c(ring).
 
 Création anneau : ring:build(N). avec N nombre de nœud.
@@ -57,4 +61,26 @@ Avoir un message : ring:getvalue(Key, PID).
 Supprimer un message : ring:erase(Key, PID).
 
 Envoyer un message : ring:send(Message, UUID, PID).
+
+\subsection{Fichier ring2.erl}
+
+Lancer : erl -name name@adresse\_ip -setcookie nom\_cookie
+
+(Par exemple : erl -name stephane@192.167.26.36 -setcookie ens)
+
+Veuillez ensuite connecté tous les noeuds entre eux en faisant : net\_adm('name@ip'). (Remarque si un noeud est connecté à tous alors il suffit de se connecté une fois a lui et on sera connecté a tout le monde)
+
+Création anneau : ring2:start().
+
+Broadcast : ring2:broad(PID).
+
+Ajout d'un nœud : ring2:add(PID).
+
+Suppression d'un nœud : ring2:kill(PID).
+
+Avoir un message : ring2:getvalue(Key, PID).
+
+Supprimer un message : ring2:erase(Key, PID).
+
+Envoyer un message : ring2:send(Message, UUID, PID).
 \end{document}

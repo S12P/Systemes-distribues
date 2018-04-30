@@ -1,5 +1,5 @@
-s-module(ring2).
--export([build/2, ring_node/6, loop/1, data/1, broad/1, add/1, kill/1, send/3, erase/2, getvalue/2, start/0, sort/1, elmt/2]).
+-module(ring2).
+-export([build/2, ring_node/6, loop/1, data/1, broad/1, add/2, kill/1, send/3, erase/2, getvalue/2, start/0, sort/1, elmt/2]).
 
 start() -> X = nodes(), L = length(X), build(L, X).
 
@@ -74,9 +74,9 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root, Data) ->
     {create, N, Noeud} ->
 	X = elmt(Noeud, N-1),
       Child = spawn(X, ?MODULE, ring_node, [self(), null, Manager, Taille_ring,Root, Data]),
-      %io:fwrite("b~n"),
+      io:fwrite("b~n"),
 Child ! {create, N-1, Noeud},
-%sio:fwrite("c~n"),
+io:fwrite("c~n"),
       Manager ! {creation, Taille_ring, N},
       ring_node(self(), Child, Manager, Taille_ring, Root, Data);
 
@@ -98,8 +98,8 @@ Child ! {create, N-1, Noeud},
     ring_node(Father, Child, Manager, NewTaille_ring, Root, Data); %pid de celui qu'on supprime et son fils
                                           true -> ChildPid ! {kill, PID, Child, NewTaille_ring}, ring_node(Father, ChildPid, Manager, NewTaille_ring, Root, Data) end;
 
-    {add} -> %io:fwrite("add~p~n",[self()]),
-    Child = spawn(node(), ?MODULE, ring_node, [null, null, Manager, Taille_ring+1, null, Data]),
+    {add, Node} -> %io:fwrite("add~p~n",[self()]),
+    Child = spawn(Node, ?MODULE, ring_node, [null, null, Manager, Taille_ring+1, null, Data]),
     io:fwrite("addChild ~p~n",[Child]),
     Child ! {add2, ChildPid, Taille_ring+1},
     ring_node(self(), Child, Manager, Taille_ring+1, Root, Data);
@@ -137,7 +137,7 @@ Child ! {create, N-1, Noeud},
 
 broad(PID) -> PID ! {broad}.
 
-add(PID) -> PID ! {add}.
+add(PID, Node) -> PID ! {add, Node}.
 
 kill(PID) -> PID ! {kill, PID}.
 
