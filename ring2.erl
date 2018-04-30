@@ -1,13 +1,23 @@
--module(ring).
--export([build/1, ring_node/6, loop/1, data/1, broad/1, add/1, kill/1, send/3, erase/2, getvalue/2]).
+s-module(ring2).
+-export([build/2, ring_node/6, loop/1, data/1, broad/1, add/1, kill/1, send/3, erase/2, getvalue/2, start/0, sort/1, elmt/2]).
 
-build(N) ->
+start() -> X = nodes(), L = length(X), build(L, X).
+
+sort([]) -> [];
+sort([P | L]) -> io:fwrite("~p~p~n", [P,L]), sort([X || X <- L, X < P]) ++ [P] ++ sort([X || X <- L, X >= P]).
+
+
+elmt(L, 0) -> hd(L);
+elmt([H|Q], P) -> elmt(Q, P-1).
+
+
+build(N, Noeuds) ->
   Manager = self(),
   register(ring, Manager),
   Data = spawn(node(), ?MODULE, data, [dict:new()]),
   Data ! {debut},
   Root = spawn(node(), ?MODULE, ring_node, [null, null, Manager, N, null, Data]),
-  Root ! {createdebut, N},
+  Root ! {createdebut, N, Noeuds},
   loop(N).
 
 data(Dict) ->
@@ -26,7 +36,7 @@ data(Dict) ->
 loop(N) ->
   receive
 
-    {bro, PID} -> PID ! {broad}; 
+    {bro, PID} -> PID ! {broad}; %io:fwrite("wesh");
 
     yo -> io:fwrite("yop~n");
 
@@ -49,21 +59,24 @@ loop(N) ->
 ring_node(Father, ChildPid, Manager, Taille_ring, Root, Data) ->
   receive
 
-    yo -> io:fwrite("yopp");
 
-    {create, 0} ->
+    {create, 0, Noeud} -> 
       Manager ! {bro, self()},
       ring_node(self(), Root, Manager, Taille_ring, Root, Data);
 
-    {createdebut, N} ->
-      Child = spawn(node(), ?MODULE, ring_node, [self(), null, Manager, Taille_ring, self(), Data]),
-      Child ! {create, N-1},
+    {createdebut, N, Noeud} ->
+      Child = spawn(elmt(Noeud,N-1), ?MODULE, ring_node, [self(), null, Manager, Taille_ring, self(), Data]),
+			ZZ = elmt(Noeud, N-1),
+      Child ! {create, N-1, Noeud},
       Manager ! {creation, Taille_ring, N},
       ring_node(self(), Child, Manager, Taille_ring,Root, Data);
 
-    {create, N} ->
-      Child = spawn(node(), ?MODULE, ring_node, [self(), null, Manager, Taille_ring,Root, Data]),
-      Child ! {create, N-1},
+    {create, N, Noeud} ->
+	X = elmt(Noeud, N-1),
+      Child = spawn(X, ?MODULE, ring_node, [self(), null, Manager, Taille_ring,Root, Data]),
+      %io:fwrite("b~n"),
+Child ! {create, N-1, Noeud},
+%sio:fwrite("c~n"),
       Manager ! {creation, Taille_ring, N},
       ring_node(self(), Child, Manager, Taille_ring, Root, Data);
 
@@ -79,7 +92,7 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root, Data) ->
 
     {val, Val} -> io:fwrite("On recoit la valeur ~p~n",[Val]), ring_node(Father, ChildPid, Manager, Taille_ring, Root, Data);
 
-    {kill, PID} when self() == PID -> ChildPid ! {kill, self(), ChildPid, Taille_ring-1};
+    {kill, PID} when self() == PID -> ChildPid ! {kill, self(), ChildPid, Taille_ring-1};%, ring_node(Father, ChildPid, Manager, Taille_ring, Root);
 
     {kill, PID, Child, NewTaille_ring} -> if ChildPid == PID ->
     ring_node(Father, Child, Manager, NewTaille_ring, Root, Data); %pid de celui qu'on supprime et son fils
@@ -96,6 +109,7 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root, Data) ->
     NewChild ! {broadadd, NewTaille_ring},
     ring_node(self(), NewChild, Manager, NewTaille_ring, Root, Data);
 
+% faire pour gerer taille ring
     {broadadd, NewTaille_ring} -> io:fwrite("Début broadcastadd~p~n",[ChildPid]),
     ChildPid ! {broadadd, 0, ChildPid, NewTaille_ring}, ring_node(Father, ChildPid, Manager, NewTaille_ring,Root, Data);
 
