@@ -74,9 +74,9 @@ ring_node(Father, ChildPid, Manager, Taille_ring, Root, Data) ->
     {create, N, Noeud} ->
 	X = elmt(Noeud, N-1),
       Child = spawn(X, ?MODULE, ring_node, [self(), null, Manager, Taille_ring,Root, Data]),
-      io:fwrite("b~n"),
+      %io:fwrite("b~n"),
 Child ! {create, N-1, Noeud},
-io:fwrite("c~n"),
+%io:fwrite("c~n"),
       Manager ! {creation, Taille_ring, N},
       ring_node(self(), Child, Manager, Taille_ring, Root, Data);
 
